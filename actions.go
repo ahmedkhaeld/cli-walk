@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"fmt"
 	"io"
 	"log"
@@ -40,4 +41,85 @@ func delFile(path string, l *log.Logger) error {
 
 	l.Println(path)
 	return nil
+}
+
+//archiveFile takes in
+//destDire: where the files will be archived;
+//root: the root dir where search was started, use this value to create a similar tree in the destination
+//;path: the path of the file to be archived
+//;return a potential error
+//
+//archiveFile has two responsibilities:
+//preserve the relative dir tree
+//so the files are archived in the same directories relative to the source root
+//,and to compress the data
+//
+//e.g.  $ go run . -root /tmp/gomisc/ -ext .go -archive /tmp/gomisc_bkp
+//
+//destDir : /tmp/go_misc_bkp; source /tmp/go_misc/
+//
+//targetPath: /tmp/go_misc_bkp/misc/reboot/reboot_test.go.gz
+//
+//combined from
+//
+//destDir: /tmp/go_misc_bkp/
+//
+// relDir: /misc/reboot/
+//
+// fileBase: reboot_test.go.
+func archiveFile(destDir, root, path string) error {
+
+	info, err := os.Stat(destDir)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%s is not a directory", destDir)
+	}
+
+	//extract the relative directory tree of the file to be archived in
+	//related to its source root path
+	relDir, err := filepath.Rel(root, filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	//append to the fileBase  .gz extension
+	fileBase := fmt.Sprintf("%s.gz", filepath.Base(path))
+
+	//join all the three pieces together to generate target path
+	targetPath := filepath.Join(destDir, relDir, fileBase)
+	//e.g. targetPath /tmp/go_misc_bkp/misc/reboot/reboot_test.go.gz
+	//destDir: /tmp/go_misc_bkp/
+	// relDir: /misc/reboot/
+	// fileBase: reboot_test.go.gz
+
+	if err := os.MkdirAll(filepath.Dir(targetPath), 0755); err != nil {
+		return err
+	}
+
+	out, err := os.OpenFile(targetPath, os.O_RDWR|os.O_CREATE, 0644)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	in, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	zw := gzip.NewWriter(out)
+
+	zw.Name = filepath.Base(path)
+
+	if _, err = io.Copy(zw, in); err != nil {
+		return err
+	}
+
+	if err := zw.Close(); err != nil {
+		return err
+	}
+
+	return out.Close()
 }

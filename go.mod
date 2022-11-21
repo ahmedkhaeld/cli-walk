@@ -1,3 +1,3 @@
-module github.com/ahmedkhaeld/cli-walk
+module github.com/ahmedkhaeld/walk
 
 go 1.17

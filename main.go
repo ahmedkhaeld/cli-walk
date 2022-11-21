@@ -11,11 +11,12 @@ import (
 
 //config  holds flags configurations
 type config struct {
-	ext  string    //extension to filter out
-	size int64     //min file size
-	list bool      //list files
-	del  bool      // delete file
-	wLog io.Writer //represent the log destination
+	ext     string    //extension to filter out
+	size    int64     //min file size
+	list    bool      //list files
+	del     bool      // delete file
+	wLog    io.Writer //represent the log destination
+	archive string    //archive dir
 }
 
 func main() {
@@ -23,6 +24,7 @@ func main() {
 	logFile := flag.String("log", "", "Log deletes to this file")
 	//action options
 	list := flag.Bool("list", false, "List files only")
+	archive := flag.String("archive", "", "Archive directory")
 	del := flag.Bool("del", false, "Delete files")
 
 	//filter options
@@ -47,11 +49,12 @@ func main() {
 
 	//create an instance with the flag values
 	c := config{
-		ext:  *ext,
-		size: *size,
-		list: *list,
-		del:  *del,
-		wLog: f, // inject filename
+		ext:     *ext,
+		size:    *size,
+		list:    *list,
+		del:     *del,
+		wLog:    f, // inject filename
+		archive: *archive,
 	}
 
 	if err := run(*root, os.Stdout, c); err != nil {
@@ -79,6 +82,12 @@ func run(root string, out io.Writer, cfg config) error {
 			// If list was explicitly set, don't do anything else
 			if cfg.list {
 				return listFile(path, out)
+			}
+
+			if cfg.archive != "" {
+				if err := archiveFile(cfg.archive, root, path); err != nil {
+					return err
+				}
 			}
 
 			//inject the path to be deleted, and dest logs file
